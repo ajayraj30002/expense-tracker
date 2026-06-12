@@ -56,6 +56,7 @@ A professional personal expense tracking application with analytics, dark/light 
 ## How to Run (Exact Commands)
 
 ### 1. Clone the repository
+
 `bash
 git clone https://github.com/ajayraj30002/expense-tracker.git
 cd expense-tracker
