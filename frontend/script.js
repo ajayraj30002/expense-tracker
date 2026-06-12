@@ -200,19 +200,19 @@ function displayExpenses(expenses) {
         return;
     }
     
-    let html = ' <div style="overflow-x: auto;"> <table> <thead> <tr> <th>Date</th> <th>Title</th> <th>Category</th> <th>Amount</th> <th>Actions</th> </tr> </thead> <tbody>';
+    let html = '<div style="overflow-x: auto;"> <table> <thead> <tr> <th>Date</th> <th>Title</th> <th>Category</th> <th>Amount</th> <th>Actions</th> </tr> </thead> <tbody>';
     
     for (const expense of expenses) {
         html += `<tr>
                     <td>${expense.date}</td>
                     <td><strong>${escapeHtml(expense.title)}</strong></td>
                     <td>${expense.category}</td>
-                    <td>₹${expense.amount.toFixed(2)}</td>
+                    <td>₹${Number(expense.amount).toFixed(2)}</td>
                     <td class="action-buttons">
                         <button class="btn-edit" onclick="editExpense(${expense.id})">Edit</button>
                         <button class="btn-delete" onclick="deleteExpense(${expense.id})">Delete</button>
                     </td>
-                </tr>`;
+                 </tr>`;
     }
     
     html += '</tbody> </table> </div>';
@@ -326,7 +326,7 @@ async function loadMonthlySummary() {
         let html = `
             <div class="summary-total">
                 <h4>Total Spent This Month</h4>
-                <div class="amount">₹${summary.total.toFixed(2)}</div>
+                <div class="amount">₹${Number(summary.total).toFixed(2)}</div>
             </div>
             <div class="category-breakdown">
                 <h4>Breakdown by Category</h4>
@@ -338,7 +338,7 @@ async function loadMonthlySummary() {
             for (const [category, amount] of Object.entries(summary.breakdown)) {
                 html += `<div class="category-item">
                             <span class="category-name">${category}</span>
-                            <span class="category-amount">₹${amount.toFixed(2)}</span>
+                            <span class="category-amount">₹${Number(amount).toFixed(2)}</span>
                         </div>`;
             }
         }
@@ -364,7 +364,7 @@ document.getElementById('exportCSV').addEventListener('click', async () => {
         
         let csvContent = 'Date,Title,Category,Amount (INR)\n';
         for (const expense of expenses) {
-            csvContent += `"${expense.date}","${escapeCsv(expense.title)}","${expense.category}",${expense.amount.toFixed(2)}\n`;
+            csvContent += `"${expense.date}","${escapeCsv(expense.title)}","${expense.category}",${Number(expense.amount).toFixed(2)}\n`;
         }
         
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -412,14 +412,6 @@ document.getElementById('amount').addEventListener('input', (e) => {
     const amount = parseFloat(e.target.value);
     validateAmount(amount, 'amountError', 'amount');
 });
-
-// Real-time amount validation for edit modal
-if (document.getElementById('editAmount')) {
-    document.getElementById('editAmount').addEventListener('input', (e) => {
-        const amount = parseFloat(e.target.value);
-        validateAmount(amount, 'editAmountError', 'editAmount');
-    });
-}
 
 function escapeHtml(text) {
     const div = document.createElement('div');
