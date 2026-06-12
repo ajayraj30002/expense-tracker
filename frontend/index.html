@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker | Personal Finance</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1>Expense Tracker</h1>
+                    <p>Personal Finance Management</p>
+                </div>
+                <div class="theme-wrapper">
+                    <span class="theme-label">Appearance</span>
+                    <button id="themeToggle" class="theme-toggle">Light</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Analytics Dashboard -->
+        <div class="analytics-grid">
+            <div class="analytics-card">
+                <div class="analytics-label">Total Spent</div>
+                <div class="analytics-value" id="totalSpent">₹0</div>
+            </div>
+            <div class="analytics-card">
+                <div class="analytics-label">Average Expense</div>
+                <div class="analytics-value" id="avgExpense">₹0</div>
+            </div>
+            <div class="analytics-card">
+                <div class="analytics-label">Top Category</div>
+                <div class="analytics-value" id="topCategory">-</div>
+            </div>
+            <div class="analytics-card">
+                <div class="analytics-label">Total Expenses</div>
+                <div class="analytics-value" id="totalCount">0</div>
+            </div>
+        </div>
+
+        <!-- Spending Trend -->
+        <div id="trendCard" class="trend-card" style="display: none;">
+            <div class="trend-header">
+                <span>Monthly Trend</span>
+                <span id="trendValue" class="trend-value"></span>
+            </div>
+            <div class="trend-bar-container">
+                <div class="trend-bar" id="trendBar" style="width: 0%"></div>
+            </div>
+            <div class="trend-details">
+                <span>Previous Month: <strong id="prevAmount">₹0</strong></span>
+                <span>Current Month: <strong id="currentAmount">₹0</strong></span>
+            </div>
+        </div>
+
+        <!-- Add Expense Form - Compact -->
+        <div class="form-card">
+            <div class="card-header">
+                <h2 id="formTitle">Add New Expense</h2>
+            </div>
+            <form id="expenseForm">
+                <input type="hidden" id="editId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="title" required placeholder="Coffee at Starbucks">
+                    </div>
+                    <div class="form-group">
+                        <label>Amount (₹)</label>
+                        <input type="number" id="amount" step="0.01" required placeholder="0.00">
+                        <span class="error-message" id="amountError">Amount must be greater than zero</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="category" required>
+                            <option value="food">Food</option>
+                            <option value="transport">Transport</option>
+                            <option value="shopping">Shopping</option>
+                            <option value="bills">Bills</option>
+                            <option value="entertainment">Entertainment</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="date" required>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="submitBtn">Add Expense</button>
+                    <button type="button" class="btn-secondary" id="cancelBtn" style="display: none">Cancel Edit</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Monthly Summary - Moved here (above filters) -->
+        <div class="summary-card">
+            <div class="summary-header">
+                <h3>Monthly Summary</h3>
+                <span class="summary-month" id="currentMonth"></span>
+            </div>
+            <div id="monthlySummary" class="summary-content">Loading...</div>
+        </div>
+
+        <!-- Filters - Cleaner layout -->
+        <div class="filters-card">
+            <div class="filters-header">
+                <h3>Filter Expenses</h3>
+                <button id="resetFilters" class="btn-outline">Reset All</button>
+            </div>
+            <div class="filters-layout">
+                <div class="filters-row">
+                    <select id="filterCategory" class="filter-input">
+                        <option value="all">All Categories</option>
+                        <option value="food">Food</option>
+                        <option value="transport">Transport</option>
+                        <option value="shopping">Shopping</option>
+                        <option value="bills">Bills</option>
+                        <option value="entertainment">Entertainment</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <div class="date-group">
+                        <span class="date-label">From</span>
+                        <input type="date" id="filterDateFrom" class="filter-input">
+                    </div>
+                    <div class="date-group">
+                        <span class="date-label">To</span>
+                        <input type="date" id="filterDateTo" class="filter-input">
+                    </div>
+                    <select id="filterMonth" class="filter-input">
+                        <option value="">All Months</option>
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                    <select id="filterYear" class="filter-input">
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026" selected>2026</option>
+                    </select>
+                </div>
+                <div class="filters-row">
+                    <input type="text" id="filterTitle" placeholder="Search by title..." class="filter-input search-input">
+                    <div class="filters-actions">
+                        <button id="applyFilters" class="btn-primary">Apply Filters</button>
+                        <button id="exportCSV" class="btn-success">Export CSV</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expenses List -->
+        <div class="expenses-card">
+            <div class="expenses-header">
+                <h3>All Expenses</h3>
+                <span class="expenses-count" id="expenseCount">0 expenses</span>
+            </div>
+            <div class="table-container" id="expensesList">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Expense</h3>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="editExpenseId">
+                <div class="modal-form-group">
+                    <label>Title</label>
+                    <input type="text" id="editTitle" required>
+                </div>
+                <div class="modal-form-group">
+                    <label>Amount (₹)</label>
+                    <input type="number" id="editAmount" step="0.01" required>
+                </div>
+                <div class="modal-form-group">
+                    <label>Category</label>
+                    <select id="editCategory" required>
+                        <option value="food">Food</option>
+                        <option value="transport">Transport</option>
+                        <option value="shopping">Shopping</option>
+                        <option value="bills">Bills</option>
+                        <option value="entertainment">Entertainment</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="modal-form-group">
+                    <label>Date</label>
+                    <input type="date" id="editDate" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                    <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
