@@ -56,6 +56,23 @@ A professional personal expense tracking application with analytics, dark/light 
 ## How to Run (Exact Commands)
 
 ### 1. Clone the repository
-```bash
+`bash
 git clone https://github.com/ajayraj30002/expense-tracker.git
 cd expense-tracker
+`
+
+### Step 2: Install dependencies
+
+`bash
+pip install fastapi uvicorn
+`
+
+### Step 3: Start the server
+
+`bash
+uvicorn backend.main:app --reload
+`
+
+### Step 4: Open the app
+
+Open your browser and go to: `http://localhost:8000
