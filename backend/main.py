@@ -1,8 +1,10 @@
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from datetime import date
 from typing import Optional
+import time
+import logging
 import os
 
 from .models import ExpenseCreate, Expense, Category
@@ -12,6 +14,32 @@ from .database import (
 )
 
 app = FastAPI()
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    
+    # Log incoming request
+    logger.info(f"→ {request.method} {request.url.path}")
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Calculate duration
+    duration = time.time() - start_time
+    
+    # Log response
+    logger.info(f"← {request.method} {request.url.path} - Status: {response.status_code} - {duration:.3f}s")
+    
+    # Add duration header
+    response.headers["X-Process-Time"] = str(duration)
+    
+    return response
 
 # CORS for frontend
 app.add_middleware(
@@ -26,9 +54,15 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     init_db()
+    logger.info("Database initialized")
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "timestamp": date.today().isoformat()}
 
 # API Endpoints
-@app.get("/expenses", status_code=status.HTTP_200_OK)
+@app.get("/expenses", status_code=200)
 def get_expenses(
     category: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
@@ -38,7 +72,7 @@ def get_expenses(
     expenses = filter_expenses_db(category, date_from, date_to, title_search)
     return expenses
 
-@app.post("/expenses", status_code=status.HTTP_201_CREATED)
+@app.post("/expenses", status_code=201)
 def create_expense(expense: ExpenseCreate):
     try:
         expense_id = add_expense_db(
@@ -47,15 +81,16 @@ def create_expense(expense: ExpenseCreate):
             expense.category.value,
             expense.date.isoformat()
         )
+        logger.info(f"Created expense {expense_id}: {expense.title}")
         return {"id": expense_id, **expense.dict()}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
-@app.put("/expenses/{expense_id}", status_code=status.HTTP_200_OK)
+@app.put("/expenses/{expense_id}", status_code=200)
 def update_expense(expense_id: int, expense: ExpenseCreate):
     existing = get_expense_by_id_db(expense_id)
     if not existing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
+        raise HTTPException(status_code=404, detail="Expense not found")
     
     try:
         update_expense_db(
@@ -65,43 +100,39 @@ def update_expense(expense_id: int, expense: ExpenseCreate):
             expense.category.value,
             expense.date.isoformat()
         )
+        logger.info(f"Updated expense {expense_id}: {expense.title}")
         return {"id": expense_id, **expense.dict()}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
-@app.delete("/expenses/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/expenses/{expense_id}", status_code=204)
 def delete_expense(expense_id: int):
     existing = get_expense_by_id_db(expense_id)
     if not existing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
+        raise HTTPException(status_code=404, detail="Expense not found")
     
     delete_expense_db(expense_id)
-    return None  # 204 No Content
+    logger.info(f"Deleted expense {expense_id}")
+    return None
 
-@app.get("/summary/monthly", status_code=status.HTTP_200_OK)
+@app.get("/summary/monthly", status_code=200)
 def get_monthly_summary(year: int, month: int):
     if month < 1 or month > 12:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Month must be between 1 and 12")
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
     if year < 2000 or year > 2100:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Year must be between 2000 and 2100")
+        raise HTTPException(status_code=400, detail="Year must be between 2000 and 2100")
     
     return get_monthly_summary_db(year, month)
 
-# NEW: Analytics Endpoint (Feature #3)
-@app.get("/analytics", status_code=status.HTTP_200_OK)
+@app.get("/analytics", status_code=200)
 def get_analytics():
-    """Get spending analytics and insights"""
     from .database import get_db_connection
     
     conn = get_db_connection()
     
-    # Total spent all time
     total_all_cents = conn.execute("SELECT COALESCE(SUM(amount_cents), 0) FROM expenses").fetchone()[0]
-    
-    # Average expense amount
     avg_cents = conn.execute("SELECT COALESCE(AVG(amount_cents), 0) FROM expenses").fetchone()[0]
     
-    # Most used category
     top_category = conn.execute("""
         SELECT category, COUNT(*) as count 
         FROM expenses 
@@ -110,7 +141,6 @@ def get_analytics():
         LIMIT 1
     """).fetchone()
     
-    # Highest spending category (by amount)
     top_spending_category = conn.execute("""
         SELECT category, SUM(amount_cents) as total 
         FROM expenses 
@@ -119,7 +149,6 @@ def get_analytics():
         LIMIT 1
     """).fetchone()
     
-    # Highest single expense
     highest_expense = conn.execute("""
         SELECT title, amount_cents, date 
         FROM expenses 
@@ -127,34 +156,35 @@ def get_analytics():
         LIMIT 1
     """).fetchone()
     
-    # Total expenses count
     total_count = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
     
-    # Spending trend (last 30 days vs previous 30 days)
     from datetime import datetime, timedelta
     
     today = date.today()
-    last_30_start = today - timedelta(days=30)
-    last_30_end = today
-    prev_30_start = today - timedelta(days=60)
-    prev_30_end = today - timedelta(days=30)
+    current_month_start = date(today.year, today.month, 1)
     
-    last_30_cents = conn.execute("""
+    if today.month == 1:
+        prev_month_start = date(today.year - 1, 12, 1)
+        prev_month_end = date(today.year, 1, 1)
+    else:
+        prev_month_start = date(today.year, today.month - 1, 1)
+        prev_month_end = date(today.year, today.month, 1)
+    
+    current_month_cents = conn.execute("""
+        SELECT COALESCE(SUM(amount_cents), 0) FROM expenses 
+        WHERE date >= ? AND date <= ?
+    """, (current_month_start.isoformat(), today.isoformat())).fetchone()[0]
+    
+    prev_month_cents = conn.execute("""
         SELECT COALESCE(SUM(amount_cents), 0) FROM expenses 
         WHERE date >= ? AND date < ?
-    """, (last_30_start.isoformat(), last_30_end.isoformat())).fetchone()[0]
-    
-    prev_30_cents = conn.execute("""
-        SELECT COALESCE(SUM(amount_cents), 0) FROM expenses 
-        WHERE date >= ? AND date < ?
-    """, (prev_30_start.isoformat(), prev_30_end.isoformat())).fetchone()[0]
+    """, (prev_month_start.isoformat(), prev_month_end.isoformat())).fetchone()[0]
     
     conn.close()
     
-    # Calculate trend percentage
     trend_percentage = 0
-    if prev_30_cents > 0:
-        trend_percentage = round(((last_30_cents - prev_30_cents) / prev_30_cents) * 100, 1)
+    if prev_month_cents > 0:
+        trend_percentage = round(((current_month_cents - prev_month_cents) / prev_month_cents) * 100, 1)
     
     return {
         "total_spent_all_time": round(total_all_cents / 100, 2),
@@ -168,8 +198,8 @@ def get_analytics():
         } if highest_expense else None,
         "total_expenses_count": total_count,
         "spending_trend": {
-            "last_30_days": round(last_30_cents / 100, 2),
-            "previous_30_days": round(prev_30_cents / 100, 2),
+            "last_30_days": round(current_month_cents / 100, 2),
+            "previous_30_days": round(prev_month_cents / 100, 2),
             "percentage_change": trend_percentage,
             "direction": "up" if trend_percentage > 0 else "down" if trend_percentage < 0 else "stable"
         }
